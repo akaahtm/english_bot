@@ -25,7 +25,7 @@ gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 ANALYSIS_PROMPT = """(기존 프롬프트 내용 유지)"""
 
 # Flask 및 Telegram Application 설정
-flask_app = Flask(__name__)
+app = Flask(__name__)
 # ApplicationBuilder에서 .updater(None)을 설정해야 Webhook 모드로 동작하기 편합니다.
 bot_app = ApplicationBuilder().token(TELEGRAM_TOKEN).updater(None).build()
 
