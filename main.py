@@ -12,7 +12,7 @@ logging.basicConfig(level=logging.INFO)
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 GROQ_API_KEY = os.environ["GROQ_API_KEY"]
 GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
-WEBHOOK_URL = os.environ["WEBHOOK_URL"]  # Cloud Run URL (배포 후 입력)
+
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
