@@ -89,14 +89,12 @@ def health():
     return "Bot is running!", 200
 
 if __name__ == "__main__":
-    # 웹훅 자동 설정 로직
+    # 웹훅 자동 설정
     async def setup_webhook():
         await bot_app.initialize()
         await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-        logger.info(f"Webhook set to: {WEBHOOK_URL}/webhook")
 
     asyncio.run(setup_webhook())
     
     port = int(os.environ.get("PORT", 8080))
-    # Flask 앱 실행
     app.run(host="0.0.0.0", port=port)
