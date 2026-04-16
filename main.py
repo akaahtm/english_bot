@@ -47,7 +47,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 bot_app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO | filters.Document.AUDIO, handle_voice))
 bot_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
 
-@flask_app.route("/webhook", methods=["POST"])
+@app.route("/webhook", methods=["POST"])
 async def webhook():
     """텔레그램으로부터 업데이트를 받아 처리하는 엔드포인트"""
     if request.method == "POST":
@@ -56,7 +56,7 @@ async def webhook():
         await bot_app.process_update(update)
         return "ok", 200
 
-@flask_app.route("/", methods=["GET"])
+@app.route("/", methods=["GET"])
 def health():
     return "Bot is running!", 200
 
@@ -73,4 +73,4 @@ if __name__ == "__main__":
     loop.run_until_complete(main_setup())
     
     port = int(os.environ.get("PORT", 8080))
-    flask_app.run(host="0.0.0.0", port=port)
+    app.run(host="0.0.0.0", port=port)
