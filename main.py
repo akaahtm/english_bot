@@ -8,7 +8,7 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTyp
 from groq import Groq
 import google.generativeai as genai
 
-# 로그 설정
+# 로그 설정 (Railway 로그에서 실시간 확인 가능)
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -25,26 +25,33 @@ gemini_model = genai.GenerativeModel("gemini-1.5-flash")
 
 ANALYSIS_PROMPT = """당신은 영어 회화 코치입니다. 아래 전사본을 바탕으로 학습 리포트를 만들어주세요.
 [전사본]: {transcript}
-요약, 교정, 자연스러운 표현을 포함해 한국어로 답변해주세요."""
+핵심 요약, 문법 교정, 더 자연스러운 표현을 포함해 한국어로 답변해주세요."""
 
 app = Flask(__name__)
-# Webhook 방식에서는 updater(None) 필수
 bot_app = ApplicationBuilder().token(TELEGRAM_TOKEN).updater(None).build()
 
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """음성/오디오 파일 처리"""
-    # 봇이 응답을 시작했다는 것을 즉시 알림
-    status_msg = await update.message.reply_text("✅ 수신 완료! 분석 중입니다... (30초~1분 소요)")
+    """음성/오디오 파일 수신 시 처리"""
+    logger.info(f"오디오 파일 수신: {update.effective_user.first_name}")
+    
+    # 1. 수신 즉시 문구 출력
+    status_msg = await update.message.reply_text("✅ 수신완료! 분석중... (약 30초 소요)")
     
     try:
-        audio_file_obj = update.message.voice or update.message.audio or update.message.document
-        file = await audio_file_obj.get_file()
+        # 파일 객체 식별 (Voice, Audio, Document 모두 대응)
+        audio_source = update.message.voice or update.message.audio or update.message.document
+        if not audio_source:
+            await status_msg.edit_text("❌ 오디오 파일을 찾을 수 없습니다.")
+            return
+
+        file = await audio_source.get_file()
+        ext = ".ogg" if update.message.voice else ".mp3"
         
-        with tempfile.NamedTemporaryFile(suffix=".ogg", delete=False) as tmp:
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
             await file.download_to_drive(tmp.name)
             tmp_path = tmp.name
 
-        # Groq (Whisper) 변환
+        # Groq (Whisper) 처리
         with open(tmp_path, "rb") as f:
             transcription = groq_client.audio.transcriptions.create(
                 model="whisper-large-v3", file=f, language="en"
@@ -54,47 +61,16 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
         response = gemini_model.generate_content(ANALYSIS_PROMPT.format(transcript=transcription.text))
         
         # 결과 전송
-        await update.message.reply_text(f"🗣️ **전사본:**\n{transcription.text}")
+        await update.message.reply_text(f"🗣️ **[전사본]**\n{transcription.text}")
         await update.message.reply_text(response.text)
         
+        # 임시 파일 삭제
         os.unlink(tmp_path)
+
     except Exception as e:
-        logger.error(f"Error: {e}")
-        await update.message.reply_text(f"❌ 오류 발생: {str(e)}")
+        logger.error(f"Error in handle_voice: {e}")
+        await update.message.reply_text(f"❌ 분석 중 에러가 발생했습니다: {str(e)}")
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("👋 영어 음성 파일을 보내주시면 분석해 드릴게요!")
-
-# 핸들러 등록
-bot_app.add_handler(MessageHandler(filters.VOICE | filters.AUDIO | filters.Document.AUDIO, handle_voice))
-bot_app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), handle_text))
-
-@app.route("/webhook", methods=["POST"])
-async def webhook_handler():
-    """텔레그램에서 오는 신호를 처리"""
-    if request.method == "POST":
-        try:
-            # 봇 앱이 초기화되지 않았다면 실행
-            if not bot_app.running:
-                await bot_app.initialize()
-            
-            update = Update.de_json(await request.get_json(), bot_app.bot)
-            await bot_app.process_update(update)
-        except Exception as e:
-            logger.error(f"Webhook Error: {e}")
-        return "OK", 200
-
-@app.route("/")
-def health():
-    return "Bot is running!", 200
-
-if __name__ == "__main__":
-    # 웹훅 자동 설정
-    async def setup_webhook():
-        await bot_app.initialize()
-        await bot_app.bot.set_webhook(url=f"{WEBHOOK_URL}/webhook")
-
-    asyncio.run(setup_webhook())
-    
-    port = int(os.environ.get("PORT", 8080))
-    app.run(host="0.0.0.0", port=port)
+    """모든 텍스트 메시지에 대해 응답"""
+    logger.info(f"텍
