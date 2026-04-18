@@ -4,7 +4,6 @@ import tempfile
 from telegram import Update
 from telegram.ext import ApplicationBuilder, MessageHandler, filters, ContextTypes
 from groq import Groq
-import google.generativeai as genai
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -14,11 +13,8 @@ logger = logging.getLogger(__name__)
 
 TELEGRAM_TOKEN = os.environ["TELEGRAM_TOKEN"]
 GROQ_API_KEY   = os.environ["GROQ_API_KEY"]
-GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 groq_client = Groq(api_key=GROQ_API_KEY)
-genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 ANALYSIS_PROMPT = """
 당신은 친절한 영어 회화 코치입니다. 아래는 전화영어 수업 녹음의 전사본입니다.
@@ -58,7 +54,6 @@ processing_users = set()
 async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
 
-    # 처리 중이면 대기 안내
     if user_id in processing_users:
         await update.message.reply_text("처리중입니다. 기다려 주세요.")
         return
@@ -111,15 +106,18 @@ async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("음성을 인식하지 못했습니다. 다시 시도해주세요.")
             return
 
-        # Gemini 분석
+        # Groq LLM 분석
         prompt = ANALYSIS_PROMPT.format(transcript=transcript)
-        response = gemini_model.generate_content(prompt)
-        result = response.text
+        response = groq_client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=4096
+        )
+        result = response.choices[0].message.content
 
         # 결과 전송 (2000자 단위 분할)
-        chunk_size = 2000
-        for i in range(0, len(result), chunk_size):
-            await update.message.reply_text(result[i:i+chunk_size])
+        for i in range(0, len(result), 2000):
+            await update.message.reply_text(result[i:i+2000])
 
     except Exception as e:
         logger.error(f"Error: {e}", exc_info=True)
