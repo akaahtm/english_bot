@@ -18,7 +18,7 @@ GEMINI_API_KEY = os.environ["GEMINI_API_KEY"]
 
 groq_client = Groq(api_key=GROQ_API_KEY)
 genai.configure(api_key=GEMINI_API_KEY)
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+gemini_model = genai.GenerativeModel("gemini-2.0-flash")
 
 ANALYSIS_PROMPT = """
 당신은 친절한 영어 회화 코치입니다. 아래는 전화영어 수업 녹음의 전사본입니다.
